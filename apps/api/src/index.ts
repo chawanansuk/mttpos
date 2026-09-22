@@ -23,6 +23,12 @@ const app = Fastify({
     ? { transport: undefined, level: 'info' }
     : { level: 'warn' },
   bodyLimit: 8 * 1024 * 1024,
+  // ต้นฉบับมีบั๊ก: เปิด URL ที่มี "/" ต่อท้าย (เช่น /product/) แล้วถูกล็อก
+  // ของเราให้ router มองว่าเป็น path เดียวกัน และชั้นตรวจสิทธิ์ก็ normalize path อยู่แล้ว (หัวข้อ 2.3)
+  routerOptions: {
+    ignoreTrailingSlash: true,
+    ignoreDuplicateSlashes: true,
+  },
 })
 
 await app.register(cors, { origin: env.corsOrigin, credentials: true })
