@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+.pnpm-store/
+apps/web/public/sw.js
+apps/web/public/workbox-*.js

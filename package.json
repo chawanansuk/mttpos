@@ -1,0 +1,20 @@
+{
+  "name": "medee-pos",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Medee POS — ระบบขายหน้าร้าน (POS) + หลังบ้าน สำหรับร้านมีดีทวีคูณ",
+  "packageManager": "pnpm@10.33.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @medee/domain test",
+    "db:generate": "pnpm --filter @medee/db generate",
+    "db:push": "pnpm --filter @medee/db push",
+    "db:seed": "pnpm --filter @medee/db seed",
+    "db:reset": "pnpm --filter @medee/db reset",
+    "dev:api": "pnpm --filter @medee/api dev",
+    "dev:web": "pnpm --filter @medee/web dev",
+    "dev": "pnpm -r --parallel dev"
+  }
+}
