@@ -14,3 +14,5 @@ apps/web/public/workbox-*.js
 packages/db/.env
 apps/api/.env
 apps/api/uploads/
+apps/web/.env.local
+*.tmp.mjs

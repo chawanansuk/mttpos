@@ -1,0 +1,13 @@
+{
+  "name": "Medee POS",
+  "short_name": "Medee POS",
+  "description": "ระบบขายหน้าร้านและหลังบ้าน ร้านมีดีทวีคูณ",
+  "start_url": "/pos",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3F4F7",
+  "theme_color": "#2EB88A",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
