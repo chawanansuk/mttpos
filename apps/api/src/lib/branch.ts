@@ -1,15 +1,21 @@
 import { prisma, type Branch } from '@medee/db'
+
+/** สาขาพร้อมชื่อร้าน — ฝั่ง POS ต้องใช้ทั้งคู่ตอนแสดงหัวใบเสร็จและหน้าล็อก */
+export type BranchWithShop = Branch & { shop: { id: string; name: string; logoImage: string | null } }
 import { businessDay, businessDayRange, type BillConfig, type RoundingType } from '@medee/domain'
 import { notFound } from './errors.js'
 
-const cache = new Map<string, { at: number; branch: Branch }>()
+const cache = new Map<string, { at: number; branch: BranchWithShop }>()
 const TTL_MS = 5_000
 
 /** โหลดตั้งค่าสาขา (cache สั้น ๆ เพราะทุก request ต้องใช้) */
-export async function getBranch(branchId: string): Promise<Branch> {
+export async function getBranch(branchId: string): Promise<BranchWithShop> {
   const hit = cache.get(branchId)
   if (hit && Date.now() - hit.at < TTL_MS) return hit.branch
-  const branch = await prisma.branch.findFirst({ where: { id: branchId, deletedAt: null } })
+  const branch = await prisma.branch.findFirst({
+    where: { id: branchId, deletedAt: null },
+    include: { shop: { select: { id: true, name: true, logoImage: true } } },
+  })
   if (!branch) throw notFound('ไม่พบสาขาที่ระบุ')
   cache.set(branchId, { at: Date.now(), branch })
   return branch

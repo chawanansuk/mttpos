@@ -16,3 +16,4 @@ apps/api/.env
 apps/api/uploads/
 apps/web/.env.local
 *.tmp.mjs
+*.tmp.sh
