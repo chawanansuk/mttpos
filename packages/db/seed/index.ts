@@ -149,12 +149,13 @@ async function main() {
       lines: bill.lines.map((l) => ({ ref: l.ref, qty: l.qty, discount: l.discount })),
     })
   }
+  await closeHistoryRounds([...historyRounds.values()])
   console.log(`   • ${history.length} บิล ใน ${days.length} วันทำการ`)
 
   console.log('💰 เปิดรอบการขายของวันที่ 22/09/2026...')
   const round = await prisma.cashRound.create({
     data: {
-      branchId: branch.id, posDeviceId: pos002.id, roundNo: 1, businessDay: '2026-09-21',
+      branchId: branch.id, posDeviceId: pos002.id, roundNo: 2, businessDay: '2026-09-21',
       openedAt: bkk('2026-09-21T15:44:00'), openedById: cashier1.id,
       openingCash: '4210.00', status: 'open',
     },
@@ -409,17 +410,17 @@ async function seedHistoryRounds(
 ) {
   const map = new Map<string, string>()
   for (const [i, day] of days.entries()) {
-    const nextDay = days[i + 1]
     const openedAt = bkk(`${day}T07:30:00`)
-    const closedAt = nextDay ? bkk(`${day}T15:45:00`) : null
+    // ร้านเปิดรอบเช้าแล้วปิดบ่ายวันเดียวกัน ยกเว้นรอบของวันที่ 22/09 ที่ seed แยกไว้และยังเปิดอยู่
+    const closedAt = bkk(`${day}T15:45:00`)
     const openingCash = 4000 + ((i * 55) % 300)
     const round = await prisma.cashRound.create({
       data: {
         branchId, posDeviceId, roundNo: 1, businessDay: day,
         openedAt, openedById: cashierId,
         openingCash: openingCash.toFixed(2),
-        closedAt, closedById: closedAt ? cashierId : null,
-        status: closedAt ? 'closed' : 'open',
+        closedAt, closedById: cashierId,
+        status: 'closed',
       },
     })
     map.set(day, round.id)
@@ -451,8 +452,18 @@ async function seedHistoryRounds(
     })
   }
 
-  // ปิดยอดรอบย้อนหลังให้ตัวเลขในรายงาน "ปิดรอบการขาย" ครบถ้วน
-  for (const [day, roundId] of map) {
+  return map
+}
+
+/**
+ * ปิดยอดรอบย้อนหลังหลังจากบันทึกบิลครบแล้ว
+ * ร้านนับเงินได้ตรงกับที่ควรมีทุกรอบ (ส่วนต่าง 0.00) เหมือนข้อมูลจริงในหัวข้อ 6.6
+ */
+async function closeHistoryRounds(roundIds: string[]) {
+  for (const roundId of roundIds) {
+    const round = await prisma.cashRound.findUniqueOrThrow({ where: { id: roundId } })
+    if (round.status !== 'closed') continue
+
     const agg = await prisma.receipt.aggregate({
       where: { cashRoundId: roundId, status: 'ปกติ' },
       _sum: { grandTotal: true },
@@ -460,8 +471,7 @@ async function seedHistoryRounds(
     const io = await prisma.cashInOut.findMany({ where: { cashRoundId: roundId } })
     const cashIn = io.filter((r) => r.type === 'IN').reduce((a, r) => a.plus(r.amount), new Prisma.Decimal(0))
     const cashOut = io.filter((r) => r.type === 'OUT').reduce((a, r) => a.plus(r.amount), new Prisma.Decimal(0))
-    const round = await prisma.cashRound.findUniqueOrThrow({ where: { id: roundId } })
-    if (round.status !== 'closed') continue
+
     const s = summarizeCashRound({
       openingCash: round.openingCash.toFixed(2),
       cashSales: (agg._sum.grandTotal ?? new Prisma.Decimal(0)).toFixed(2),
@@ -476,10 +486,7 @@ async function seedHistoryRounds(
         expectedCash: s.expectedCash, countedCash: s.expectedCash, diff: '0.00',
       },
     })
-    void day
   }
-
-  return map
 }
 
 /** บันทึกบิลของวันที่ 22/09/2026 ตาม fixture จริง (หัวข้อ 10.10) */

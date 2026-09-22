@@ -12,3 +12,5 @@ coverage/
 apps/web/public/sw.js
 apps/web/public/workbox-*.js
 packages/db/.env
+apps/api/.env
+apps/api/uploads/
