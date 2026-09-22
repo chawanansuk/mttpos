@@ -13,7 +13,7 @@ import {
 } from '@medee/domain/fixtures'
 import { BRANCH, CATEGORIES, OPTIONS, POS_DEVICES, SALES_CHANNEL_CONFIGS, SHOP, UNITS } from './data/branch.js'
 import { PRODUCTS } from './data/products.js'
-import { bkk, createSeedReceipt, moveStock, type ProductRef } from './lib.js'
+import { bkk, createSeedReceipt, createSeedReceiptsBatch, moveStock, type ProductRef } from './lib.js'
 import {
   DAY_22_BILLS, DAY_22_DISCOUNT, DAY_22_SALES, DAY_22_VOID_VALUE, generateHistory,
   MONTH_DISCOUNT_BILLS, MONTH_DISCOUNT_TOTAL, MONTH_TOTAL_BILLS, MONTH_TOTAL_SALES,
@@ -132,9 +132,10 @@ async function main() {
 
   const historyRounds = await seedHistoryRounds(branch.id, pos002.id, cashier1.id, days)
   let runNumber = 5000
-  for (const bill of history) {
+  // เขียนเป็นชุด — ทีละใบจะยิง query ราว 5,000 ครั้ง ซึ่งช้ามากเมื่อฐานข้อมูลอยู่ไกล
+  await createSeedReceiptsBatch(prisma, history.map((bill) => {
     runNumber += 1
-    await createSeedReceipt(prisma, {
+    return {
       branchId: branch.id,
       posDeviceId: pos002.id,
       cashRoundId: historyRounds.get(bill.businessDay) ?? null,
@@ -147,8 +148,8 @@ async function main() {
       voidedBy: bill.status === 'ยกเลิก' ? 'cashier1' : null,
       voidReason: bill.status === 'ยกเลิก' ? 'ลูกค้าเปลี่ยนใจ' : null,
       lines: bill.lines.map((l) => ({ ref: l.ref, qty: l.qty, discount: l.discount })),
-    })
-  }
+    }
+  }))
   await closeHistoryRounds([...historyRounds.values()])
   console.log(`   • ${history.length} บิล ใน ${days.length} วันทำการ`)
 
