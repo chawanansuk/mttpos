@@ -36,7 +36,7 @@ export const FIXTURE_PRODUCTS: FixtureProduct[] = [
   { key: 'elephant', barcode: '8852814000958', name: 'Elephant ลูกเหม็นแบ่ง', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '8.00', cost: '0.00', vatType: 'N' }, // *ต้นทุน 0
   { key: 'firelighter', barcode: '8985634452574', name: 'ไฟฟู่MT013/Box', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '12.00', cost: '0.00', vatType: 'N' }, // *ต้นทุน 0
   { key: 'buga', barcode: '8859233900012', name: 'Buga แก๊สเล็ก', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '20.00', cost: '17.00', vatType: 'N' }, // *272/16
-  { key: 'hongthai3cc', barcode: '8859126000768', name: 'hongthai3cc', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '25.00', cost: '20.71', vatType: 'N' }, // *331.36/16
+  { key: 'hongthai3cc', barcode: '8859126000768', name: 'hongthai3cc', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '30.00', cost: '20.71', vatType: 'N' }, // *331.36/16 — บิล PS002006900 ขายส่ง 25/ชิ้น
   { key: 'hongthai10g', barcode: '8859126000508', name: 'หงส์ไทย10gHongthai10g', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '40.00', cost: '30.00', vatType: 'N' }, // *4950/165
   { key: 'Hanuman5g', barcode: '18857128671624', name: 'Hanuman5g', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '160.00', cost: '108.00', vatType: 'N' }, // *5616/52
   { key: 'packHanuman', barcode: '18857128671013', name: 'packHanuman', category: 'เบ็ดเตล็ด', unit: 'ชิ้น', price: '140.00', cost: '97.00', vatType: 'N' }, // *4656/48

@@ -15,6 +15,8 @@ export interface FixtureLine {
   qty: number
   /** ส่วนลดรายการ (จำนวนเงิน) */
   discount?: string
+  /** ราคาขายจริงของบิลนี้ เมื่อไม่ใช่ราคาปกติ (เช่น ขายส่ง) */
+  unitPrice?: string
 }
 
 export interface FixtureBill {
@@ -86,7 +88,7 @@ export const DAY_2026_09_22: FixtureBill[] = [
     lines: [{ product: 'poysian', qty: 1 }] },
   // ขายส่ง hongthai3cc 12 ชิ้น ราคาส่ง 25 (หัวข้อ 6.6)
   { receiptNo: 'PS002006900', soldAt: '2026-09-22T12:16:11+07:00', status: 'ปกติ',
-    lines: [{ product: 'hongthai3cc', qty: 12 }, { product: 'Hanuman5g', qty: 3 }, { product: 'packHanuman', qty: 1 }, { product: 'ExtendableMttGas', qty: 2 }] },
+    lines: [{ product: 'hongthai3cc', qty: 12, unitPrice: '25.00' }, { product: 'Hanuman5g', qty: 3 }, { product: 'packHanuman', qty: 1 }, { product: 'ExtendableMttGas', qty: 2 }] },
   { receiptNo: 'PS002006901', soldAt: '2026-09-22T12:44:41+07:00', status: 'ปกติ', memberKey: 'vip p',
     lines: [{ product: 'solder', qty: 2 }] },
 
@@ -110,7 +112,7 @@ export function fixtureLineToItem(line: FixtureLine) {
     unitName: p.unit,
     ratio: 1,
     qty: line.qty,
-    unitPrice: p.price,
+    unitPrice: line.unitPrice ?? p.price,
     cost: p.cost,
     itemDiscount: line.discount ?? '0',
     itemDiscountType: 'amount' as const,
