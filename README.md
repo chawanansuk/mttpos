@@ -76,7 +76,23 @@ docker compose exec api pnpm db:push && docker compose exec api pnpm db:seed
   JWT_REFRESH_SECRET   สตริงสุ่มยาว ๆ อีกอัน
   ```
 
-- หลัง deploy ครั้งแรก ใส่ข้อมูลตั้งต้นด้วย `DATABASE_URL=<ของ production> pnpm db:push && pnpm db:seed`
+- **ใส่ข้อมูลตั้งต้น** — ถ้าเครื่องคุณต่อฐานข้อมูลได้ ใช้
+  `DATABASE_URL=<ของ production> pnpm db:push && pnpm db:seed`
+
+  ถ้าต่อไม่ได้ (เช่นอยู่หลังไฟร์วอลล์ที่เปิดแค่พอร์ต 443) ให้ยืมขั้นตอน build ของ Vercel ทำแทน
+  โดยตั้งตัวแปรเพิ่มสองตัวแล้ว deploy ใหม่หนึ่งครั้ง:
+
+  ```
+  DIRECT_DATABASE_URL   การต่อแบบ session/ตรง (Supabase พอร์ต 5432) — ใช้สร้างตาราง
+  SEED_DATABASE         yes-wipe-and-seed
+  ```
+
+  `scripts/bootstrap-db.mjs` จะรัน `prisma db push --force-reset` แล้ว seed ให้ตอน build
+  **ลบ `SEED_DATABASE` ออกทันทีที่เสร็จ** ไม่งั้น deploy ครั้งถัดไปจะล้างข้อมูลจริงทิ้ง
+
+> Supabase ต้องใช้สอง URL: พอร์ต **6543** (transaction pooler ต่อท้าย `?pgbouncer=true&connection_limit=1`)
+> เป็น `DATABASE_URL` สำหรับตอนรัน และพอร์ต **5432** (session) เป็น `DIRECT_DATABASE_URL` สำหรับสร้างตาราง
+> เพราะ PgBouncer โหมด transaction ใช้ prepared statement กับ advisory lock ที่ Prisma ต้องการไม่ได้
 
 ข้อจำกัดของโหมด serverless:
 
