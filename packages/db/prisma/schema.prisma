@@ -3,7 +3,9 @@
 // เวลา: timestamptz + timezone ของสาขา · primary key: uuid · soft delete ด้วย deletedAt
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native = เครื่องที่ dev อยู่ · rhel-openssl-3.0.x = รันไทม์ของ Vercel (Amazon Linux 2023)
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

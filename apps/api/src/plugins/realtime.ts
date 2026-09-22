@@ -56,3 +56,18 @@ export default fp(async (app) => {
     })
   })
 })
+
+/**
+ * ใช้แทน realtime บน serverless (Vercel) ซึ่งถือ WebSocket ค้างไว้ไม่ได้
+ * เส้นทางอื่นเรียก app.broadcast() ได้เหมือนเดิม แต่ไม่ส่งอะไรออกไป
+ * ฝั่งเว็บจะได้ข้อมูลใหม่จากการ refetch ของ TanStack Query แทน
+ */
+export const noopRealtime = fp(async (app) => {
+  app.decorate('broadcast', () => {})
+  app.get('/ws', async (_req, reply) =>
+    reply.status(501).send({
+      error: 'ระบบนี้ติดตั้งแบบ serverless จึงไม่รองรับการเชื่อมต่อแบบเรียลไทม์',
+      code: 'REALTIME_UNAVAILABLE',
+    }),
+  )
+})

@@ -2,7 +2,7 @@
  * Seed ข้อมูลจริงของร้านมีดีทวีคูณ สาขาสำเพ็ง (หัวข้อ 10)
  * รันด้วย `pnpm db:seed` — เปิดระบบมาแล้วต้องขายได้ทันทีและทุกรายงานมีข้อมูล
  */
-import argon2 from 'argon2'
+import argon2 from '../src/password.js'
 import { Prisma, PrismaClient } from '@prisma/client'
 import {
   allCashierPermissions, buildPermissionSet, DEFAULT_DELIVERY_PROVIDERS, ownerPermissionSet,

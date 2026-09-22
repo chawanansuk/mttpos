@@ -1,4 +1,4 @@
-import argon2 from 'argon2'
+import argon2 from '@medee/db/password'
 import crypto from 'node:crypto'
 import type { FastifyPluginAsync } from 'fastify'
 import { prisma } from '@medee/db'

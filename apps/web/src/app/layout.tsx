@@ -14,6 +14,8 @@ export const metadata: Metadata = {
   title: 'Medee POS',
   description: 'ระบบขายหน้าร้านและหลังบ้าน — ร้านมีดีทวีคูณ',
   manifest: '/manifest.json',
+  // ประกาศไอคอนให้ชัด ไม่งั้นเบราว์เซอร์จะไปขอ /favicon.ico เองแล้วได้ 404
+  icons: { icon: '/icon.svg', shortcut: '/icon.svg', apple: '/icon.svg' },
   appleWebApp: { capable: true, title: 'Medee POS', statusBarStyle: 'black-translucent' },
 }
 

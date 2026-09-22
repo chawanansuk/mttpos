@@ -20,14 +20,16 @@ interface OpenBill {
 
 export default function CurrentBillPage() {
   const branchId = typeof window === 'undefined' ? null : session.branchId
+  // บิลที่เปิดอยู่ต้องอัปเดตทันทีเมื่อเครื่องขายพักบิลหรือปิดบิล
+  const { lastEvent, unavailable } = useRealtime(branchId)
+
   const query = useQuery({
     queryKey: ['open-bills', branchId],
     queryFn: () => api<{ data: OpenBill[]; total: number }>('/open-bills'),
     enabled: Boolean(branchId),
+    // ถ้าปลายทางไม่มี WebSocket (ติดตั้งแบบ serverless) ให้ดึงซ้ำตามรอบแทน
+    refetchInterval: unavailable ? 15_000 : false,
   })
-
-  // บิลที่เปิดอยู่ต้องอัปเดตทันทีเมื่อเครื่องขายพักบิลหรือปิดบิล
-  const { lastEvent } = useRealtime(branchId)
   useEffect(() => {
     if (lastEvent?.event === 'open_bill.updated' || lastEvent?.event === 'receipt.created') {
       void query.refetch()

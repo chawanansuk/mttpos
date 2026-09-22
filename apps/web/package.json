@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "prebuild": "pnpm --filter @medee/db generate",
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
@@ -10,11 +11,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@medee/api": "workspace:*",
+    "@medee/db": "workspace:*",
     "@medee/domain": "workspace:*",
     "@tanstack/react-query": "^5.62.7",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.13",
     "dexie": "^4.4.6",
+    "fastify": "^5.2.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

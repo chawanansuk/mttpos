@@ -5,7 +5,10 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./password": "./src/password.ts"
+  },
   "scripts": {
     "generate": "prisma generate",
     "push": "prisma db push",
@@ -14,17 +17,19 @@
     "seed": "tsx seed/index.ts",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
-    "build": "prisma generate"
+    "build": "prisma generate",
+    "test": "vitest run",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "@medee/domain": "workspace:*",
-    "argon2": "^0.41.1"
+    "@medee/domain": "workspace:*"
   },
   "devDependencies": {
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "@types/node": "^22.10.1"
+    "@types/node": "^22.10.1",
+    "vitest": "^2.1.8"
   }
 }

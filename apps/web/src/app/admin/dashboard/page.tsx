@@ -49,14 +49,16 @@ export default function DashboardPage() {
   const { range } = useShell()
   const branchId = typeof window === 'undefined' ? null : session.branchId
 
+  // ยอดวันนี้อัปเดตทันทีเมื่อมีบิลใหม่จากเครื่องขาย
+  const { lastEvent, unavailable } = useRealtime(branchId)
+
   const query = useQuery({
     queryKey: ['dashboard', branchId, range.from, range.to],
     queryFn: () => api<Dashboard>('/reports/dashboard', { query: { from: range.from, to: range.to } }),
     enabled: Boolean(branchId),
+    // ถ้าปลายทางไม่มี WebSocket (ติดตั้งแบบ serverless) ให้ดึงซ้ำตามรอบแทน
+    refetchInterval: unavailable ? 30_000 : false,
   })
-
-  // ยอดวันนี้อัปเดตทันทีเมื่อมีบิลใหม่จากเครื่องขาย
-  const { lastEvent } = useRealtime(branchId)
   useEffect(() => {
     if (lastEvent?.event === 'receipt.created' || lastEvent?.event === 'receipt.voided') {
       void query.refetch()

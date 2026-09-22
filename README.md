@@ -55,6 +55,37 @@ docker compose up -d          # postgres + api + web
 docker compose exec api pnpm db:push && docker compose exec api pnpm db:seed
 ```
 
+### Deploy บน Vercel
+
+ระบบรันได้สองแบบจากโค้ดชุดเดียวกัน ต่างกันแค่ว่าตั้ง `API_URL` ไว้หรือไม่:
+
+| | เว็บ | API |
+|---|---|---|
+| **สองโปรเซส** (dev · Docker · VPS) | `apps/web` พอร์ต 3000 | `apps/api` พอร์ต 4000 — Next rewrite `/api/v1/*` ไปให้ |
+| **โปรเซสเดียว** (Vercel) | `apps/web` | route handler เรียก `buildApp()` ของ Fastify ผ่าน `app.inject()` ในโปรเซสเดียวกัน |
+
+ตั้งค่าโปรเจกต์บน Vercel:
+
+- **Root Directory** — `apps/web`
+- **Environment Variables** — ตั้งแค่สามตัวนี้ และ **ห้ามตั้ง** `API_URL` หรือ `NEXT_PUBLIC_API_URL`
+  (ถ้าตั้ง เว็บจะพยายาม proxy ออกไปข้างนอกแทนที่จะเสิร์ฟ API เอง)
+
+  ```
+  DATABASE_URL         postgresql://...   ← ควรเป็น connection pooler
+  JWT_SECRET           สตริงสุ่มยาว ๆ
+  JWT_REFRESH_SECRET   สตริงสุ่มยาว ๆ อีกอัน
+  ```
+
+- หลัง deploy ครั้งแรก ใส่ข้อมูลตั้งต้นด้วย `DATABASE_URL=<ของ production> pnpm db:push && pnpm db:seed`
+
+ข้อจำกัดของโหมด serverless:
+
+- **ไม่มี WebSocket** — ฟังก์ชันไม่ได้อยู่ค้างเพื่อถือ connection หน้ารายงานสรุปกับบิลที่เปิดอยู่
+  จะเปลี่ยนไปดึงข้อมูลซ้ำตามรอบ (30 และ 15 วินาที) โดยอัตโนมัติเมื่อพบว่าต่อ `/ws` ไม่ได้
+- **rate limit ปิดอยู่** — `@fastify/rate-limit` นับในหน่วยความจำของแต่ละอินสแตนซ์ จึงไม่มีความหมายบน serverless
+  ถ้าต้องการจริงให้ใช้ Vercel Firewall หรือย้ายตัวนับไปไว้ที่ Redis
+- **ต้องใช้ connection pooler** — serverless เปิดหลายอินสแตนซ์พร้อมกัน ถ้าต่อ Postgres ตรงจะกิน connection จนเต็ม
+
 ---
 
 ## โครงสร้างโปรเจกต์
@@ -63,7 +94,7 @@ docker compose exec api pnpm db:push && docker compose exec api pnpm db:seed
 |---|---|
 | `packages/domain` | **สูตรคำนวณทั้งหมด** — ยอดบิล · ส่วนลด · VAT · ปัดเศษ · step price · ราคาช่องทาง · สต็อก · ต้นทุนเฉลี่ย · รอบเงินสด · คะแนนสมาชิก · เลขเอกสาร · วันขาย · ตารางสิทธิ์ · PromptPay QR (ไม่พึ่งพา framework ใด ๆ และมี unit test ครบ) |
 | `packages/db` | Prisma schema ตามหัวข้อ 4 + seed ข้อมูลจริงตามหัวข้อ 10 |
-| `apps/api` | Fastify — REST `/api/v1/*` + WebSocket `/ws` |
+| `apps/api` | Fastify — REST `/api/v1/*` + WebSocket `/ws` · export `buildApp()` ให้ `apps/web` ยกไปรันในโปรเซสเดียวกันได้ |
 | `apps/web` | Next.js — หน้าขาย `/pos` (PWA) และหลังบ้าน `/admin` |
 
 **สูตรคำนวณอยู่ที่เดียว**: ทั้งเครื่องขาย (คำนวณสดในเครื่องแม้ออฟไลน์) และ API (คำนวณตอนบันทึกบิล) เรียก `calculateBill` ตัวเดียวกัน ยอดจึงตรงกันเสมอ
@@ -76,7 +107,7 @@ docker compose exec api pnpm db:push && docker compose exec api pnpm db:seed
 pnpm dev             # รันทุกแอปพร้อมกัน
 pnpm dev:api         # รันเฉพาะ API
 pnpm dev:web         # รันเฉพาะเว็บ
-pnpm test            # unit test สูตรคำนวณ (packages/domain)
+pnpm test            # unit test สูตรคำนวณ + การแฮชรหัสผ่าน (149 เทสต์)
 pnpm typecheck       # ตรวจ TypeScript ทุกแพ็กเกจ
 pnpm db:seed         # ใส่ข้อมูลใหม่ (ล้างของเดิมก่อน)
 pnpm db:reset        # ล้างตาราง + push schema + seed

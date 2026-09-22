@@ -10,7 +10,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @medee/domain test",
+    "test": "pnpm --filter @medee/domain --filter @medee/db test",
     "db:generate": "pnpm --filter @medee/db generate",
     "db:push": "pnpm --filter @medee/db push",
     "db:seed": "pnpm --filter @medee/db seed",
