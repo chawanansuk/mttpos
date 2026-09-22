@@ -1,3 +1,9 @@
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const repoRoot = join(here, '..', '..')
+
 /** @type {import('next').NextConfig} */
 
 // ตั้ง API_URL เมื่อรัน API เป็นคนละโปรเซส (dev แบบสองพอร์ต, Docker, VPS)
@@ -21,6 +27,18 @@ const nextConfig = {
     'pino-pretty',
   ],
   eslint: { ignoreDuringBuilds: true },
+  // เราอยู่ใน workspace ต้องบอก Next ว่ารากของ monorepo อยู่ตรงไหน
+  // ไม่งั้นจะ trace ไฟล์นอก apps/web ไม่เจอ
+  outputFileTracingRoot: repoRoot,
+  // Prisma โหลด query engine เป็นไฟล์ .node ตอนรัน ซึ่ง bundler มองไม่เห็น
+  // และ pnpm ยังวางไว้ใต้ .pnpm/ ที่ trace ตามลิงก์ไม่ถึง จึงต้องสั่งให้รวมเข้าไปเอง
+  // ไม่งั้นจะได้ error "could not locate the Query Engine for runtime rhel-openssl-3.0.x"
+  outputFileTracingIncludes: {
+    '/api/v1/**': [
+      '../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/*.node',
+      '../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/schema.prisma',
+    ],
+  },
   webpack: (config) => {
     // แพ็กเกจในเวิร์กสเปซเขียน import แบบ ESM ลงท้าย .js แต่ไฟล์จริงเป็น .ts
     config.resolve.extensionAlias = {
