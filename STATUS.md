@@ -140,3 +140,35 @@
   ข้อกำหนด "ใส่ PIN ผิดได้ 5 ครั้ง/นาที" (หัวข้อ 11) จึงบังคับไม่ได้บน Vercel
   (การล็อกบัญชีหลังใส่ PIN ผิดสะสมยังทำงานปกติ เพราะนับในฐานข้อมูล)
 - **ต้องใช้ connection pooler** — ถ้าชี้ `DATABASE_URL` ไปที่ Postgres ตรง ๆ connection จะเต็มเมื่อมีคนใช้พร้อมกันหลายคน
+
+
+---
+
+## สถานะการ deploy
+
+| | |
+|---|---|
+| เว็บ | https://medee-pos.vercel.app (Vercel · ภูมิภาค sin1) |
+| ฐานข้อมูล | Supabase Postgres · ap-southeast-1 (Singapore) |
+| ตอนรัน | `DATABASE_URL` ผ่าน transaction pooler พอร์ต 6543 (`pgbouncer=true&connection_limit=1`) |
+| ตอน build | `DIRECT_DATABASE_URL` ผ่าน session pooler พอร์ต 5432 |
+
+**ตรวจแล้วบนลิงก์จริง: acceptance 62/62 ผ่าน** — รวมเข้าสู่ระบบ, รายงานครบ 25 หน้า,
+ดาวน์โหลด .xlsx, สร้างบิลจริงแล้วยกเลิก, ตัดและคืนสต็อก, กันบิลซ้ำด้วย clientId และ PromptPay QR
+
+ปัญหาที่เจอตอน deploy จริงและวิธีแก้ (บันทึกไว้กันลืม):
+
+1. **seed ใช้เวลาเกิน 30 นาทีจนต้องยกเลิก build** — build machine อยู่ US East แต่ฐานข้อมูลอยู่ Singapore
+   การเขียนบิลทีละใบกลายเป็นราว 5,000 รอบข้ามทวีป แก้ด้วย `createSeedReceiptsBatch()`
+   ที่เขียนด้วย `createMany` เหลือไม่กี่สิบรอบ — ประวัติ 760 บิลลดจาก 30+ นาที เหลือ **45 วินาที**
+2. **API ตอบ 500 ทุกครั้งที่แตะฐานข้อมูล** — `Prisma Client could not locate the Query Engine
+   for runtime rhel-openssl-3.0.x` เพราะ query engine เป็นไฟล์ `.node` ที่ bundler มองไม่เห็น
+   และ pnpm วางไว้ใต้ `.pnpm/` ที่ trace ตามลิงก์ไปไม่ถึง แก้ด้วย `outputFileTracingRoot`
+   และ `outputFileTracingIncludes` ใน next.config
+
+**สิ่งที่ต้องระวัง**
+
+- `SEED_DATABASE` บน Vercel ตั้งเป็น `off` อยู่ ถ้าเปลี่ยนเป็น `yes-wipe-and-seed`
+  แล้ว deploy ใหม่ **จะล้างข้อมูลทั้งหมดทิ้งแล้ว seed ใหม่**
+- การรัน acceptance ทิ้งบิลทดสอบที่ถูกยกเลิกแล้วไว้ 1 ใบ (เครื่อง 001) ตามวันที่ที่รัน
+  ไม่กระทบตัวเลขของ 22/09/2026 ซึ่งเป็นเกณฑ์ยอมรับ
