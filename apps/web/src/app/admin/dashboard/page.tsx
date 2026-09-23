@@ -8,7 +8,7 @@ import {
 import { api, ApiError, session } from '@/lib/api'
 import { useShell } from '@/components/admin/Shell'
 import { Card, EmptyState, NoAccess, PageHeader, Spinner } from '@/components/ui'
-import { baht, intNumber, qty } from '@/lib/format'
+import { baht, intNumber, qty, signedBaht } from '@/lib/format'
 import { useRealtime } from '@/hooks/useRealtime'
 
 interface Dashboard {
@@ -122,7 +122,7 @@ export default function DashboardPage() {
           <h2 className="mb-3 text-sm font-semibold">สรุปยอด</h2>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between"><dt className="text-slate-500">รวมก่อนลด</dt><dd className="tabular-nums">{baht(d.summary.subtotal)}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">ส่วนลดท้ายบิล</dt><dd className="tabular-nums">-{baht(d.summary.billDiscount)}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">ส่วนลดท้ายบิล</dt><dd className="tabular-nums">{signedBaht(d.summary.billDiscount, '-')}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">สินค้ามีภาษี</dt><dd className="tabular-nums">{baht(d.summary.vatableAmount)}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">สินค้าไม่มีภาษี</dt><dd className="tabular-nums">{baht(d.summary.nonVatableAmount)}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">คิดเป็นมูลค่าภาษี {d.summary.vatRate}%</dt><dd className="tabular-nums">{baht(d.summary.vatAmount)}</dd></div>

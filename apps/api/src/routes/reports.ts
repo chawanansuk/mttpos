@@ -169,8 +169,8 @@ const routes: FastifyPluginAsync = async (app) => {
         return rows.map((r) => ({
           day: r.day,
           subtotal: money(r.subtotal),
-          // ต้นฉบับแสดงส่วนลดเป็นค่าลบ
-          discount: `-${money(r.discount)}`,
+          // ต้นฉบับแสดงส่วนลดเป็นค่าลบ — แต่วันที่ไม่มีส่วนลดต้องเป็น 0.00 ไม่ใช่ -0.00
+          discount: Number(r.discount) > 0 ? `-${money(r.discount)}` : money(0),
           vatAmount: money(r.vatAmount),
           serviceCharge: money(r.serviceCharge),
           profit: money(r.profit),

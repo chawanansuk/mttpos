@@ -8,7 +8,7 @@ import { getBranchSettings, type BranchSettings } from '@/lib/pos/sync'
 import { PosHeader } from '@/components/pos/PosHeader'
 import { Numpad } from '@/components/pos/Numpad'
 import { Modal } from '@/components/ui'
-import { baht, dateTimeTH } from '@/lib/format'
+import { baht, dateTimeTH, signedBaht } from '@/lib/format'
 
 interface CashRound {
   id: string
@@ -164,8 +164,8 @@ export default function CashPage() {
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between"><dt className="text-slate-500">เงินทอนเริ่มต้น</dt><dd className="tabular-nums">{baht(round.openingCash)}</dd></div>
                 <div className="flex justify-between"><dt className="text-slate-500">ยอดขายด้วยเงินสด</dt><dd className="tabular-nums">{baht(round.cashSales)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">นำเงินเข้า</dt><dd className="tabular-nums text-brand">+{baht(round.cashInTotal)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">นำเงินออก</dt><dd className="tabular-nums text-danger">-{baht(round.cashOutTotal)}</dd></div>
+                <div className="flex justify-between"><dt className="text-slate-500">นำเงินเข้า</dt><dd className="tabular-nums text-brand">{signedBaht(round.cashInTotal, '+')}</dd></div>
+                <div className="flex justify-between"><dt className="text-slate-500">นำเงินออก</dt><dd className="tabular-nums text-danger">{signedBaht(round.cashOutTotal, '-')}</dd></div>
                 <div className="flex justify-between border-t border-slate-100 pt-2 text-base font-semibold dark:border-slate-800">
                   <dt>ควรมีในลิ้นชัก</dt><dd className="tabular-nums">{baht(expected?.expectedCash ?? 0)}</dd>
                 </div>

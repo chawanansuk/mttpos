@@ -89,3 +89,12 @@ export function isNumericCell(value: unknown): boolean {
   const s = String(value ?? '')
   return /^-?[\d,]+(\.\d+)?$/.test(s)
 }
+
+/**
+ * ใส่เครื่องหมาย +/− หน้าจำนวนเงินเฉพาะเมื่อไม่ใช่ศูนย์
+ * ไม่งั้นส่วนลดหรือเงินออกที่เป็นศูนย์จะขึ้นเป็น "-0.00" ซึ่งดูเหมือนมีรายการ
+ */
+export function signedBaht(value: unknown, sign: '+' | '-'): string {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) && n !== 0 ? `${sign}${baht(Math.abs(n))}` : baht(0)
+}
