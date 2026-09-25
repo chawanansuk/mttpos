@@ -25,11 +25,15 @@ if (process.env.SEED_DATABASE !== CONFIRM) {
  * เพราะ Prisma ต้องใช้ prepared statement และ advisory lock
  * ตอน build จึงต้องต่อผ่าน DIRECT_DATABASE_URL (session pooler / ต่อตรง พอร์ต 5432)
  */
-const directUrl = process.env.DIRECT_DATABASE_URL
+const DIRECT_URL_KEYS = ['DIRECT_DATABASE_URL', 'DATABASE_URL_UNPOOLED', 'POSTGRES_URL_NON_POOLING']
+const directKey = DIRECT_URL_KEYS.find((k) => process.env[k])
+const directUrl = directKey ? process.env[directKey] : undefined
 if (!directUrl) {
-  console.error('✗ ต้องตั้ง DIRECT_DATABASE_URL (การต่อแบบ session/ตรง) ก่อนจึงจะ seed ได้')
+  console.error(`✗ ต้องตั้งการต่อแบบตรง (ไม่ผ่าน pooler) ด้วยตัวแปรใดตัวแปรหนึ่ง: ${DIRECT_URL_KEYS.join(' / ')}`)
+  console.error('  Neon ผ่าน Vercel ตั้ง DATABASE_URL_UNPOOLED ให้ · Supabase ใช้ session pooler พอร์ต 5432')
   process.exit(1)
 }
+console.log(`• ใช้ ${directKey} สำหรับสร้างตารางและ seed`)
 
 const env = { ...process.env, DATABASE_URL: directUrl }
 

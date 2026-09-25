@@ -94,16 +94,19 @@ docker compose exec api pnpm db:push && docker compose exec api pnpm db:seed
   โดยตั้งตัวแปรเพิ่มสองตัวแล้ว deploy ใหม่หนึ่งครั้ง:
 
   ```
-  DIRECT_DATABASE_URL   การต่อแบบ session/ตรง (Supabase พอร์ต 5432) — ใช้สร้างตาราง
-  SEED_DATABASE         yes-wipe-and-seed
+  DATABASE_URL_UNPOOLED   การต่อแบบตรง ไม่ผ่าน pooler — ใช้สร้างตาราง
+                          (Neon ผ่าน Vercel ตั้งชื่อนี้ให้เอง · ถ้าตั้งเองจะใช้ชื่อ DIRECT_DATABASE_URL ก็ได้)
+  SEED_DATABASE           yes-wipe-and-seed
   ```
 
   `scripts/bootstrap-db.mjs` จะรัน `prisma db push --force-reset` แล้ว seed ให้ตอน build
   **ลบ `SEED_DATABASE` ออกทันทีที่เสร็จ** ไม่งั้น deploy ครั้งถัดไปจะล้างข้อมูลจริงทิ้ง
 
-> Supabase ต้องใช้สอง URL: พอร์ต **6543** (transaction pooler ต่อท้าย `?pgbouncer=true&connection_limit=1`)
-> เป็น `DATABASE_URL` สำหรับตอนรัน และพอร์ต **5432** (session) เป็น `DIRECT_DATABASE_URL` สำหรับสร้างตาราง
-> เพราะ PgBouncer โหมด transaction ใช้ prepared statement กับ advisory lock ที่ Prisma ต้องการไม่ได้
+> ต้องใช้สอง URL เสมอ: ตัวที่ผ่าน **pooler** เป็น `DATABASE_URL` สำหรับตอนรัน (serverless เปิดหลายอินสแตนซ์พร้อมกัน)
+> และตัวที่**ต่อตรง**สำหรับสร้างตาราง เพราะ PgBouncer โหมด transaction ใช้ prepared statement กับ advisory lock
+> ที่ `prisma db push` ต้องการไม่ได้ — **Neon ผ่าน Vercel** ตั้งทั้งคู่ให้เอง (`DATABASE_URL` / `DATABASE_URL_UNPOOLED`)
+> ส่วนพารามิเตอร์ `pgbouncer=true&connection_limit=1` ที่ Prisma ต้องการตอนต่อผ่าน pooler
+> ระบบเติมให้เองใน `packages/db` เมื่อเห็นว่า host มีคำว่า `pooler` จึงไม่ต้องแก้ค่าที่ integration ตั้งมา
 
 ข้อจำกัดของโหมด serverless:
 

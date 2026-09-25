@@ -149,9 +149,9 @@
 | | |
 |---|---|
 | เว็บ | https://medee-pos.vercel.app (Vercel · ภูมิภาค sin1) |
-| ฐานข้อมูล | Supabase Postgres · ap-southeast-1 (Singapore) |
-| ตอนรัน | `DATABASE_URL` ผ่าน transaction pooler พอร์ต 6543 (`pgbouncer=true&connection_limit=1`) |
-| ตอน build | `DIRECT_DATABASE_URL` ผ่าน session pooler พอร์ต 5432 |
+| ฐานข้อมูล | Neon Postgres · ap-southeast-1 (Singapore) — ติดตั้งผ่านหน้า Storage ของ Vercel (ย้ายจาก Supabase 25/09/2026 เพราะโควตาฟรีเต็ม) |
+| ตอนรัน | `DATABASE_URL` (pooled) ที่ Neon ตั้งให้ — `packages/db` เติม `pgbouncer=true&connection_limit=1` เองเมื่อ host เป็น pooler |
+| ตอน build | `DATABASE_URL_UNPOOLED` (ต่อตรง) ที่ Neon ตั้งให้ — สคริปต์ bootstrap รับทั้งชื่อนี้และ `DIRECT_DATABASE_URL` |
 
 **ตรวจแล้วบนลิงก์จริง: acceptance 62/62 ผ่าน** — รวมเข้าสู่ระบบ, รายงานครบ 25 หน้า,
 ดาวน์โหลด .xlsx, สร้างบิลจริงแล้วยกเลิก, ตัดและคืนสต็อก, กันบิลซ้ำด้วย clientId และ PromptPay QR
