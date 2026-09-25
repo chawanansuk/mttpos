@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
 import { api } from '@/lib/api'
 import { Spinner } from '@/components/ui'
@@ -64,8 +64,19 @@ function receiptDate(iso: string, buddhist: boolean): string {
   return `${get('day')}/${get('month')}/${year} ${get('hour')}:${get('minute')}`
 }
 
+/**
+ * หน้าที่จะกลับไปหลังพิมพ์ — รับเฉพาะ path ในเว็บเดียวกัน กันการพาออกไปเว็บอื่น
+ * เดิมเปิดหน้านี้เป็นแท็บใหม่แล้วกด "ปิด" แต่บน iPad ที่ติดตั้งเป็นแอป แท็บใหม่จะเด้งไป Safari
+ * ซึ่งไม่มีข้อมูลล็อกอินของแอป หน้าใบเสร็จจึงโหลดไม่ขึ้น ตอนนี้จึงเปิดในหน้าต่างเดิมเสมอ
+ */
+function safeBack(raw: string | null): string {
+  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/pos/sale'
+}
+
 export default function PrintReceiptPage() {
   const params = useParams<{ id: string }>()
+  const router = useRouter()
+  const back = safeBack(useSearchParams().get('back'))
   const query = useQuery({
     queryKey: ['receipt-print', params.id],
     queryFn: () => api<PrintData>(`/receipts/${params.id}/print`),
@@ -86,10 +97,10 @@ export default function PrintReceiptPage() {
   const voided = r.status === 'ยกเลิก'
 
   return (
-    <div className="mx-auto max-w-[80mm] bg-white p-4 font-mono text-[12px] leading-snug text-black">
+    <div className="receipt-paper mx-auto max-w-[80mm] bg-white p-4 font-mono text-[12px] leading-snug text-black">
       <div className="no-print mb-4 flex justify-center gap-2">
         <button type="button" className="btn-primary" onClick={() => window.print()}>พิมพ์ใบเสร็จ</button>
-        <button type="button" className="btn-ghost" onClick={() => window.close()}>ปิด</button>
+        <button type="button" className="btn-ghost" onClick={() => router.replace(back)}>← กลับ</button>
       </div>
 
       {voided ? (

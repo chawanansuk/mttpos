@@ -60,6 +60,8 @@
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 @media print {
+  @page { margin: 0; }
   .no-print { display: none !important; }
-  body { background: #fff; }
+  html, body { background: #fff !important; }
+  .receipt-paper { width: 72mm; max-width: none; margin: 0 auto; padding: 2mm; }
 }

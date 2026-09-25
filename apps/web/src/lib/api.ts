@@ -87,7 +87,12 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   /** ไม่แนบโทเค็น (ใช้กับ login) */
   anonymous?: boolean
   query?: Record<string, string | number | boolean | undefined | null>
+  /** ยกเลิกคำขอถ้าเซิร์ฟเวอร์ไม่ตอบภายในเวลานี้ (มิลลิวินาที) */
+  timeoutMs?: number
 }
+
+/** เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (เน็ตหลุด เซิร์ฟเวอร์ล่ม หรือรอนานเกิน) — ใช้ status 0 */
+export const NETWORK_ERROR_MESSAGE = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
   const url = `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
@@ -131,7 +136,7 @@ async function refreshSession(): Promise<boolean> {
 }
 
 export async function api<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, anonymous, query, headers, ...rest } = options
+  const { body, anonymous, query, headers, timeoutMs, signal, ...rest } = options
 
   const send = async (): Promise<Response> => {
     const finalHeaders = new Headers(headers)
@@ -144,11 +149,23 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
       const branchId = session.branchId
       if (branchId) finalHeaders.set('X-Branch-Id', branchId)
     }
-    return fetch(buildUrl(path, query), {
-      ...rest,
-      headers: finalHeaders,
-      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-    })
+    const controller = timeoutMs ? new AbortController() : null
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null
+    if (controller && signal) signal.addEventListener('abort', () => controller.abort(), { once: true })
+    try {
+      return await fetch(buildUrl(path, query), {
+        ...rest,
+        signal: controller?.signal ?? signal,
+        headers: finalHeaders,
+        body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
+      })
+    } catch (err) {
+      // ผู้เรียกยกเลิกเอง → ส่งต่อตามเดิม ที่เหลือคือติดต่อเซิร์ฟเวอร์ไม่ได้
+      if (signal?.aborted) throw err
+      throw new ApiError(0, NETWORK_ERROR_MESSAGE)
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
   }
 
   let res = await send()

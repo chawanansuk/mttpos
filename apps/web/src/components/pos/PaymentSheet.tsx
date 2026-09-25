@@ -2,6 +2,7 @@
 
 import clsx from 'clsx'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { calculateChange, outstandingAmount, promptPayPayload, type BillTotals } from '@medee/domain'
 import { api, ApiError, session } from '@/lib/api'
 import { getPaymentConfigs, queueReceipt, flushQueue, type BranchSettings } from '@/lib/pos/sync'
@@ -29,6 +30,7 @@ export function PaymentSheet({
   onDone: (receiptNo: string) => void
 }) {
   const cart = useCart()
+  const router = useRouter()
   const [configs, setConfigs] = useState<PaymentConfig[]>([])
   const [method, setMethod] = useState('เงินสด')
   const [received, setReceived] = useState('')
@@ -106,7 +108,11 @@ export function PaymentSheet({
 
     try {
       if (!navigator.onLine) throw new ApiError(0, 'ออฟไลน์')
-      const res = await api<{ id: string; receiptNo: string; change: string }>('/receipts', { method: 'POST', body: payload })
+      // รอไม่เกิน 10 วินาที ไม่งั้นลูกค้ายืนรอ — ถ้าเซิร์ฟเวอร์บันทึกไปแล้วจริง
+      // ตอนส่งคิวซ้ำจะไม่เกิดบิลซ้ำ เพราะใช้ clientId เดียวกัน
+      const res = await api<{ id: string; receiptNo: string; change: string }>('/receipts', {
+        method: 'POST', body: payload, timeoutMs: 10_000,
+      })
       setDone({ receiptNo: res.receiptNo, change: res.change, offline: false, receiptId: res.id })
     } catch (err) {
       // ออฟไลน์หรือส่งไม่สำเร็จ → เก็บเข้าคิวแล้วขายต่อได้ทันที (หัวข้อ 7.10)
@@ -151,7 +157,17 @@ export function PaymentSheet({
           ) : null}
           <div className="grid grid-cols-2 gap-2">
             {done.receiptId ? (
-              <a className="btn-ghost" href={`/print/receipt/${done.receiptId}`} target="_blank" rel="noreferrer">พิมพ์ใบเสร็จ</a>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  const id = done.receiptId
+                  onDone(done.receiptNo)
+                  router.push(`/print/receipt/${id}?back=/pos/sale`)
+                }}
+              >
+                พิมพ์ใบเสร็จ
+              </button>
             ) : <span />}
             <button type="button" className="btn-primary" onClick={() => onDone(done.receiptNo)}>บิลใหม่</button>
           </div>

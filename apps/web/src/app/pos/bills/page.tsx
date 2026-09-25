@@ -172,7 +172,7 @@ function BillsInner() {
                 </div>
                 <span className="text-lg font-semibold tabular-nums">{baht(r.grandTotal)}</span>
                 <div className="flex shrink-0 gap-1">
-                  <a className="btn-ghost h-9 px-2 text-xs" href={`/print/receipt/${r.id}`} target="_blank" rel="noreferrer">พิมพ์ซ้ำ</a>
+                  <a className="btn-ghost h-9 px-2 text-xs" href={`/print/receipt/${r.id}?back=/pos/bills`}>พิมพ์ซ้ำ</a>
                   {r.status === 'ปกติ' ? (
                     <button type="button" className="btn-ghost h-9 px-2 text-xs text-danger" onClick={() => { setVoidTarget(r); setVoidReason(''); setPin('') }}>
                       ยกเลิก

@@ -35,7 +35,11 @@ export function PosHeader({ title, right }: { title: string; right?: React.React
     setCashier(session.cashier)
     setOnline(navigator.onLine)
     void refreshStatus()
-    const on = () => setOnline(true)
+    // เน็ตกลับมา → ส่งบิลที่ค้างทันที ไม่ต้องรอรอบ 30 วินาที
+    const on = () => {
+      setOnline(true)
+      void flushQueue().then(refreshStatus)
+    }
     const off = () => setOnline(false)
     window.addEventListener('online', on)
     window.addEventListener('offline', off)

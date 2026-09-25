@@ -12,6 +12,10 @@ const externalApiUrl = process.env.API_URL
 
 const nextConfig = {
   reactStrictMode: true,
+  // ใช้เป็นเวอร์ชันของ service worker — deploy ใหม่ได้ SW ใหม่ แคชหน้าเก่าถูกล้างเอง
+  env: {
+    NEXT_PUBLIC_BUILD_ID: (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 12) || String(Date.now()),
+  },
   // แพ็กเกจในเวิร์กสเปซเป็น TypeScript ดิบ ต้องให้ Next คอมไพล์ให้
   transpilePackages: ['@medee/domain', '@medee/db', '@medee/api'],
   // แพ็กเกจฝั่งเซิร์ฟเวอร์ที่ต้องโหลดจาก node_modules ตอนรัน ไม่ใช่ให้ bundler รวมเข้าไป

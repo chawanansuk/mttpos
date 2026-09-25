@@ -261,9 +261,7 @@ export default function TransactionPage() {
                               <div className="flex flex-wrap gap-2">
                                 <a
                                   className="btn-ghost"
-                                  href={`/print/receipt/${detail.data.id}`}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  href={`/print/receipt/${detail.data.id}?back=/admin/report/transaction`}
                                 >
                                   พิมพ์ใบกำกับภาษีอย่างย่อ
                                 </a>
