@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medee
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medee}
+      POSTGRES_DB: medeepos
+      TZ: Asia/Bangkok
+    ports: ['5432:5432']
+    volumes: ['medee-pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U medee -d medeepos']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql://medee:${POSTGRES_PASSWORD:-medee}@postgres:5432/medeepos?schema=public
+      JWT_SECRET: ${JWT_SECRET:?ต้องตั้งค่า JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?ต้องตั้งค่า JWT_REFRESH_SECRET}
+      API_PORT: 4000
+      NODE_ENV: production
+      TZ: Asia/Bangkok
+    ports: ['4000:4000']
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      API_URL: http://api:4000
+      NODE_ENV: production
+      TZ: Asia/Bangkok
+    ports: ['3000:3000']
+
+volumes:
+  medee-pgdata:

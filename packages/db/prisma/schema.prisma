@@ -1,0 +1,1341 @@
+// Medee POS — schema ตามหัวข้อ 4 ของสเปก
+// เงิน: Decimal(14,2) · จำนวนสินค้า: Decimal(12,3) (รองรับขายตามน้ำหนัก)
+// เวลา: timestamptz + timezone ของสาขา · primary key: uuid · soft delete ด้วย deletedAt
+
+generator client {
+  provider      = "prisma-client-js"
+  // native = เครื่องที่ dev อยู่ · rhel-openssl-3.0.x = รันไทม์ของ Vercel (Amazon Linux 2023)
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────── 4.1 ร้าน / สาขา ──────────────────────────────
+
+model Account {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  displayName  String
+  isOwner      Boolean   @default(false)
+  enabled      Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt    DateTime? @db.Timestamptz(6)
+
+  ownedShops    Shop[]
+  branchUsers   BranchUser[]
+  refreshTokens RefreshToken[]
+
+  @@map("accounts")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  accountId String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamptz(6)
+  revokedAt DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@map("refresh_tokens")
+}
+
+model Shop {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String // "ร้านมีดีทวีคูณ"
+  ownerAccountId String   @db.Uuid
+  logoImage      String?
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  ownerAccount Account  @relation(fields: [ownerAccountId], references: [id])
+  branches     Branch[]
+
+  @@map("shops")
+}
+
+/// ตั้งค่าร้าน 71 ฟิลด์ตามต้นฉบับ (หัวข้อ 4.1)
+model Branch {
+  id           String  @id @default(uuid()) @db.Uuid
+  shopId       String  @db.Uuid
+  storeId      String? // "STR0095757"
+  branchName   String // "สำเพ็ง"
+  /// 0 = ร้านค้าทั่วไป, 1 = ร้านอาหาร, 2 = โฮสเทล
+  businessType Int     @default(0)
+
+  address1 String?
+  address2 String?
+  tel      String?
+  taxId    String  @default("")
+  lat      Float?
+  lng      Float?
+
+  timezone String @default("Asia/Bangkok")
+  language String @default("th")
+  currency String @default("THB")
+
+  /// ใช้ตัด "วันขาย" ในรายงานรายวัน (หัวข้อ 7.6)
+  openTime  String @default("00:00")
+  closeTime String @default("23:59")
+
+  plan            String    @default("SMART")
+  expireAt        DateTime? @db.Timestamptz(6)
+  enabled         Boolean   @default(true)
+  locked          Boolean   @default(false)
+  lockDescription String?
+
+  // ── ภาษี / ค่าบริการ / ปัดเศษ ──
+  vatRate              Decimal @default(0) @db.Decimal(5, 2)
+  isVatIncluded        Boolean @default(false)
+  enabledServiceCharge Boolean @default(false)
+  serviceChargeRate    Decimal @default(0) @db.Decimal(5, 2)
+  serviceChargeVatable Boolean @default(true)
+  /// none | up | down | nearest
+  roundingType         String  @default("none")
+  roundingAmount       Decimal @default(1) @db.Decimal(6, 2)
+  /// false = ใช้ stdCost, true = ใช้ต้นทุนเฉลี่ยจากการรับเข้า
+  isAvgCost            Boolean @default(false)
+
+  // ── พฤติกรรมหน้าขาย ──
+  /// ปุ่มจำนวนเงินด่วนหน้าจ่ายเงิน เช่น "20,50,100,500,1000"
+  fastInput               String  @default("20,50,100,500,1000")
+  isSoldByWeight          Boolean @default(false)
+  isMultiplePayment       Boolean @default(false)
+  editableItem            Boolean @default(true)
+  enabledAutoAddProduct   Boolean @default(false)
+  enabledCustomPayment    Boolean @default(false)
+  enabledDelivery         Boolean @default(false)
+  cashManagement          Boolean @default(true)
+  isCustomerDisplayEnable Boolean @default(false)
+  /// เงินกี่บาท = 1 คะแนนสมาชิก (0 = ไม่สะสม)
+  bahtPerPoint            Decimal @default(0) @db.Decimal(10, 2)
+
+  // ── ช่องทางชำระเงินที่เปิด ──
+  paymentCredit          Boolean @default(false)
+  paymentPromptpay       Boolean @default(false)
+  promptpayId            String?
+  promptpayAccName       String?
+  promptpayShowOnReceipt Boolean @default(false)
+  paymentCoupon          Boolean @default(false)
+  paymentDeposit         Boolean @default(false)
+  paymentQp              Boolean @default(false)
+  paymentAlipay          Boolean @default(false)
+  enabledLinepay         Boolean @default(false)
+
+  // ── ใบเสร็จ ──
+  receiptHeader            String  @default("Receipt/Tax Invoice(ABB)")
+  headerShowOnReceipt      Boolean @default(false)
+  footer1                  String?
+  footer2                  String?
+  logoImage                String?
+  footerImage1             String?
+  footerImage2             String?
+  showDetailOnReceipt      Boolean @default(true)
+  showNoteOnReceipt        Boolean @default(true)
+  showQueueOnReceipt       Boolean @default(false)
+  showBarcodeOnReceipt     Boolean @default(false)
+  showVatOnReceipt         Boolean @default(false)
+  showOptionGroupOnReceipt Boolean @default(true)
+  wordingToReplace         String  @default("FOOD & BEVERAGE")
+  /// abb = ใบกำกับภาษีอย่างย่อ, receipt = ใบเสร็จรับเงิน, custom = กำหนดเอง
+  receiptFormat            String  @default("abb")
+  /// ใบเสร็จแสดงปีเป็น พ.ศ.
+  receiptUseBuddhistYear   Boolean @default(true)
+  taxInvoiceSignerName     String?
+  taxInvoiceSignatureImage String?
+
+  // ── แจ้งเตือน ──
+  notifyEnabled         Boolean @default(false)
+  notifySales           Boolean @default(false)
+  notifyCashRound       Boolean @default(false)
+  notifyCloseShopReport Boolean @default(false)
+  notifyTimeAttendance  Boolean @default(false)
+  notifyLowStock        Boolean @default(false)
+  notifyVoidBill        Boolean @default(false)
+  /// line | telegram | discord
+  notifyChannel         String?
+  notifyRefCode         String?
+
+  // ── feature flags (schema เผื่อไว้ตามหัวข้อ 1.2) ──
+  isKioskEnabled       Boolean @default(false)
+  isSelfOrderEnabled   Boolean @default(false)
+  isOneChatFoodEnabled Boolean @default(false)
+  eMenuEnabled         Boolean @default(false)
+  grabEnabled          Boolean @default(false)
+  promotionEnabled     Boolean @default(false)
+
+  // ── เลขรันเอกสารต่อสาขา (หัวข้อ 7.9) ──
+  stockInRunNumber     Int     @default(0)
+  stockOutRunNumber    Int     @default(0)
+  adjIncRunNumber      Int     @default(0)
+  adjDecRunNumber      Int     @default(0)
+  checkStockRunNumber  Int     @default(0)
+  transferOutRunNumber Int     @default(0)
+  transferInRunNumber  Int     @default(0)
+  returnRunNumber      Int     @default(0)
+  taxInvoiceRunNumber  Int     @default(0)
+  runningQueue         Int     @default(0)
+  runningQueueDate     String?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  shop Shop @relation(fields: [shopId], references: [id])
+
+  posDevices          PosDevice[]
+  branchUsers         BranchUser[]
+  cashiers            Cashier[]
+  timesheets          Timesheet[]
+  categories          Category[]
+  units               Unit[]
+  products            Product[]
+  options             ProductOption[]
+  optionGroups        OptionGroup[]
+  salesHours          SalesHour[]
+  stockMovements      StockMovement[]
+  stockDocuments      StockDocument[]
+  cashRounds          CashRound[]
+  receipts            Receipt[]
+  members             Member[]
+  memberGroups        MemberGroup[]
+  paymentConfigs      PaymentConfig[]
+  deliveryProviders   DeliveryProvider[]
+  salesChannelConfigs SalesChannelConfig[]
+  tables              ShopTable[]
+  tableZones          TableZone[]
+  suppliers           Supplier[]
+  printers            Printer[]
+  promotions          Promotion[]
+  auditLogs           AuditLog[]
+
+  @@unique([shopId, branchName])
+  @@map("branches")
+}
+
+// ────────────────────────────── 4.2 เครื่อง POS ──────────────────────────────
+
+model PosDevice {
+  id         String  @id @default(uuid()) @db.Uuid
+  branchId   String  @db.Uuid
+  /// "001", "002", "003"
+  posNumber  String
+  /// POS | ORDER | KIOSK
+  posType    String  @default("POS")
+  /// iOS | Android | Web
+  deviceType String  @default("Web")
+  deviceName String?
+  deviceInfo Json?
+  /// device fingerprint — ผูกเครื่องแล้วเปลี่ยนไม่ได้จนกว่าจะปลด
+  uuid       String?
+  appVersion String?
+  enabled    Boolean @default(true)
+  /// กำลังถูกใช้งาน | ปลดแล้ว
+  status     String  @default("ปลดแล้ว")
+
+  scan                       Boolean @default(true)
+  printerIp                  String?
+  printReceipt               Boolean @default(false)
+  isPrintShopLogo            Boolean @default(false)
+  printAfterFinish           Boolean @default(false)
+  isPrintOrderAfterFinish    Boolean @default(false)
+  sendEmail                  Boolean @default(false)
+  /// 1 = 58mm, 2 = 80mm, 3 = A4
+  receiptType                Int     @default(1)
+  /// SMALL | LARGE — ขนาดปุ่มสินค้าบนหน้าขาย
+  itemSize                   String  @default("SMALL")
+  editableItem               Boolean @default(true)
+  autoLogin                  Boolean @default(false)
+  posIdFromRevenueDepartment String  @default("")
+  createdByCfs               Boolean @default(false)
+
+  /// ตัวนับเลขบิลของเครื่องนี้ (หัวข้อ 7.9)
+  invoiceRunNumber  Int       @default(0)
+  lastSyncProductAt DateTime? @db.Timestamptz(6)
+  lastUsedAt        DateTime? @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch     Branch      @relation(fields: [branchId], references: [id])
+  cashRounds CashRound[]
+  receipts   Receipt[]
+
+  @@unique([branchId, posNumber])
+  @@map("pos_devices")
+}
+
+// ────────────────────────────── 4.3 ผู้ใช้ / พนักงาน ──────────────────────────────
+
+model BranchUser {
+  id          String    @id @default(uuid()) @db.Uuid
+  branchId    String    @db.Uuid
+  accountId   String    @db.Uuid
+  /// owner | Manager | Franchise
+  role        String    @default("Manager")
+  /// โครงสิทธิ์ตามหัวข้อ 3.3
+  permissions Json
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt   DateTime? @db.Timestamptz(6)
+
+  branch  Branch  @relation(fields: [branchId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([branchId, accountId])
+  @@map("branch_users")
+}
+
+model Cashier {
+  id              String    @id @default(uuid()) @db.Uuid
+  branchId        String    @db.Uuid
+  name            String
+  pinHash         String
+  /// สิทธิ์ในแอป POS (หัวข้อ 3.4)
+  permissions     Json
+  orderIndex      Int       @default(0)
+  enabled         Boolean   @default(true)
+  /// บัญชีสำหรับเว็บเช็คสต็อกบนมือถือ
+  webUsername     String?
+  webPasswordHash String?
+  pinFailCount    Int       @default(0)
+  pinLockedUntil  DateTime? @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch     Branch      @relation(fields: [branchId], references: [id])
+  timesheets Timesheet[]
+  cashRounds CashRound[]
+  receipts   Receipt[]
+  cashInOuts CashInOut[]
+
+  @@unique([branchId, name])
+  @@map("cashiers")
+}
+
+model Timesheet {
+  id          String    @id @default(uuid()) @db.Uuid
+  branchId    String    @db.Uuid
+  cashierId   String    @db.Uuid
+  clockInAt   DateTime  @db.Timestamptz(6)
+  clockOutAt  DateTime? @db.Timestamptz(6)
+  /// ชั่วโมงการทำงาน (คำนวณตอนบันทึกออกงาน)
+  hours       Decimal?  @db.Decimal(8, 2)
+  posDeviceId String?   @db.Uuid
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+
+  branch  Branch  @relation(fields: [branchId], references: [id])
+  cashier Cashier @relation(fields: [cashierId], references: [id])
+
+  @@index([branchId, clockInAt])
+  @@map("timesheets")
+}
+
+// ────────────────────────────── 4.4 สินค้า ──────────────────────────────
+
+model Category {
+  id                 String  @id @default(uuid()) @db.Uuid
+  branchId           String  @db.Uuid
+  name               String
+  bgColor            String  @default("#BDBDBD")
+  icon               String?
+  enabled            Boolean @default(true)
+  /// LOW | MEDIUM | HIGH — ใช้จัดลำดับใบครัว/KDS
+  kitchenPriority    String  @default("MEDIUM")
+  showOnCustomerMenu Boolean @default(true)
+  orderIndex         Int     @default(0)
+  /// กลุ่มระบบ (Uncategory) ลบไม่ได้
+  isSystem           Boolean @default(false)
+  translations       Json?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch   Branch    @relation(fields: [branchId], references: [id])
+  products Product[]
+
+  @@unique([branchId, name])
+  @@map("categories")
+}
+
+model Unit {
+  id       String  @id @default(uuid()) @db.Uuid
+  branchId String  @db.Uuid
+  name     String
+  enabled  Boolean @default(true)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  products    Product[]
+  productPlus ProductPlu[]
+
+  @@unique([branchId, name])
+  @@map("units")
+}
+
+model Product {
+  id       String  @id @default(uuid()) @db.Uuid
+  branchId String  @db.Uuid
+  /// รหัสภายใน/import เช่น "w0169a"
+  skuCode  String?
+  name     String
+  price    Decimal @db.Decimal(14, 2)
+  stdCost  Decimal @default(0) @db.Decimal(14, 2)
+  avgCost  Decimal @default(0) @db.Decimal(14, 2)
+  /// บาร์โค้ดของ PLU หลัก
+  barcode  String?
+  /// P | BOM | SN | SV
+  skuType  String  @default("P")
+  /// V = สินค้ามีภาษี, N = ไม่มีภาษี
+  vatType  String  @default("N")
+
+  categoryId String? @db.Uuid
+  unitId     String? @db.Uuid
+
+  enabled        Boolean @default(true)
+  /// สินค้า-นิยม (แท็บแรกบนหน้าขาย)
+  favorite       Boolean @default(false)
+  favoriteIndex  Int     @default(999)
+  /// แสดงบนหน้าขาย
+  isOnScreen     Boolean @default(true)
+  /// ลำดับบนหน้าขาย (จัดจาก "จัดการเมนูขายหน้าร้าน")
+  itemSequence   Int     @default(999)
+  serviceCharge  Boolean @default(false)
+  /// ราคาด่วน — เปิดให้พิมพ์ราคาตอนขาย
+  negotiatePrice Boolean @default(false)
+  isSoldByWeight Boolean @default(false)
+  color          String  @default("rgba(158, 158, 158, 1)")
+  indexColor     Int     @default(0)
+
+  imagePath          String?
+  additionImages     Json?
+  videoPath          String?
+  description        String?
+  /// ชื่อ + บาร์โค้ด สำหรับค้นหา
+  keyword            String?
+  /// web import | pos | quick add
+  source             String   @default("web")
+  lowStockThreshold  Decimal? @db.Decimal(12, 3)
+  trackStock         Boolean  @default(true)
+  showOnCustomerMenu Boolean  @default(true)
+  translations       Json?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+  createdBy String?
+  updatedBy String?
+
+  branch   Branch    @relation(fields: [branchId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id])
+  unit     Unit?     @relation(fields: [unitId], references: [id])
+
+  plus           ProductPlu[]
+  stepPrices     ProductStepPrice[]
+  channelPrices  ProductChannelPrice[]
+  bomItems       ProductBomItem[]      @relation("BomParent")
+  usedInBoms     ProductBomItem[]      @relation("BomComponent")
+  serials        ProductSerial[]
+  optionGroups   ProductOptionGroup[]
+  stockMovements StockMovement[]
+  receiptItems   ReceiptItem[]
+  stockDocItems  StockDocumentItem[]
+
+  @@unique([branchId, barcode])
+  @@index([branchId, name])
+  @@index([branchId, categoryId])
+  @@index([branchId, favorite, favoriteIndex])
+  @@map("products")
+}
+
+/// ขนาดบรรจุ/บาร์โค้ดย่อย — ทุก SKU มีอย่างน้อย 1 PLU หลัก ratio = 1
+model ProductPlu {
+  id           String  @id @default(uuid()) @db.Uuid
+  productId    String  @db.Uuid
+  /// บาร์โค้ด — unique ต่อสาขา
+  pluCode      String
+  name         String
+  unitId       String? @db.Uuid
+  /// 1 หน่วยของ PLU นี้ = กี่หน่วยฐาน (SKU)
+  skuRatio     Decimal @default(1) @db.Decimal(12, 3)
+  price        Decimal @db.Decimal(14, 2)
+  cost         Decimal @default(0) @db.Decimal(14, 2)
+  /// คงเหลือ — นับเป็นหน่วยฐาน (SKU) เสมอ; เก็บที่ PLU หลักเท่านั้น
+  stockQty     Decimal @default(0) @db.Decimal(14, 3)
+  isDefault    Boolean @default(false)
+  /// ใช้ราคาขายเพิ่มเติม (step price) กับ PLU นี้
+  useStepPrice Boolean @default(false)
+  imagePath    String?
+  translations Json?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  product        Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  unit           Unit?               @relation(fields: [unitId], references: [id])
+  stockMovements StockMovement[]
+  receiptItems   ReceiptItem[]
+  stockDocItems  StockDocumentItem[]
+
+  @@unique([productId, pluCode])
+  @@index([pluCode])
+  @@map("product_plus")
+}
+
+model ProductStepPrice {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @db.Uuid
+  pluId     String? @db.Uuid
+  /// จำนวนขั้นต่ำที่ได้ราคานี้
+  minQty    Decimal @db.Decimal(12, 3)
+  /// ราคาขายของทั้งชุด
+  price     Decimal @db.Decimal(14, 2)
+  /// ราคาต่อหน่วย (คำนวณอัตโนมัติ = price ÷ minQty)
+  unitPrice Decimal @db.Decimal(14, 4)
+  cost      Decimal @default(0) @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, pluId, minQty])
+  @@map("product_step_prices")
+}
+
+model ProductChannelPrice {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @db.Uuid
+  /// retail | promotion | member_wholesale | grab | lineman | foodpanda | shopeefood | robinhood | truefood
+  channel   String
+  enabled   Boolean @default(false)
+  price     Decimal @default(0) @db.Decimal(14, 2)
+  gpPercent Decimal @default(0) @db.Decimal(5, 2)
+  /// ส่วนต่างจากราคาปกติ (แสดงบนการ์ดช่องทางการขาย)
+  diff      Decimal @default(0) @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, channel])
+  @@map("product_channel_prices")
+}
+
+model ProductBomItem {
+  id                 String  @id @default(uuid()) @db.Uuid
+  productId          String  @db.Uuid
+  componentProductId String  @db.Uuid
+  qtyPerUnit         Decimal @db.Decimal(12, 3)
+
+  product   Product @relation("BomParent", fields: [productId], references: [id], onDelete: Cascade)
+  component Product @relation("BomComponent", fields: [componentProductId], references: [id])
+
+  @@unique([productId, componentProductId])
+  @@map("product_bom_items")
+}
+
+model ProductSerial {
+  id            String  @id @default(uuid()) @db.Uuid
+  productId     String  @db.Uuid
+  serialNo      String
+  /// available | sold
+  status        String  @default("available")
+  receiptId     String? @db.Uuid
+  receivedDocId String? @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, serialNo])
+  @@map("product_serials")
+}
+
+model ProductOption {
+  id             String  @id @default(uuid()) @db.Uuid
+  branchId       String  @db.Uuid
+  name           String
+  price          Decimal @default(0) @db.Decimal(14, 2)
+  cost           Decimal @default(0) @db.Decimal(14, 2)
+  enabled        Boolean @default(true)
+  qrOrderEnabled Boolean @default(false)
+  orderIndex     Int     @default(0)
+  translations   Json?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch Branch            @relation(fields: [branchId], references: [id])
+  groups OptionGroupItem[]
+
+  @@unique([branchId, name])
+  @@map("options")
+}
+
+model OptionGroup {
+  id           String  @id @default(uuid()) @db.Uuid
+  branchId     String  @db.Uuid
+  name         String
+  /// ต้องการ (บังคับเลือก)
+  required     Boolean @default(false)
+  minSelect    Int     @default(0)
+  maxSelect    Int     @default(1)
+  orderIndex   Int     @default(0)
+  translations Json?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch   Branch               @relation(fields: [branchId], references: [id])
+  items    OptionGroupItem[]
+  products ProductOptionGroup[]
+
+  @@unique([branchId, name])
+  @@map("option_groups")
+}
+
+model OptionGroupItem {
+  optionGroupId String @db.Uuid
+  optionId      String @db.Uuid
+  orderIndex    Int    @default(0)
+
+  optionGroup OptionGroup   @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  option      ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([optionGroupId, optionId])
+  @@map("option_group_items")
+}
+
+model ProductOptionGroup {
+  productId     String @db.Uuid
+  optionGroupId String @db.Uuid
+  orderIndex    Int    @default(0)
+
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+
+  @@id([productId, optionGroupId])
+  @@map("product_option_groups")
+}
+
+model SalesHour {
+  id       String @id @default(uuid()) @db.Uuid
+  branchId String @db.Uuid
+  name     String
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch Branch          @relation(fields: [branchId], references: [id])
+  slots  SalesHourSlot[]
+
+  @@unique([branchId, name])
+  @@map("sales_hours")
+}
+
+model SalesHourSlot {
+  id          String @id @default(uuid()) @db.Uuid
+  salesHourId String @db.Uuid
+  /// 0 = อาทิตย์ … 6 = เสาร์
+  weekday     Int
+  start       String
+  end         String
+
+  salesHour SalesHour @relation(fields: [salesHourId], references: [id], onDelete: Cascade)
+
+  @@map("sales_hour_slots")
+}
+
+/// ตั้งค่าช่องทางการขาย/GP ระดับสาขา (หัวข้อ 6.9.7)
+model SalesChannelConfig {
+  id         String  @id @default(uuid()) @db.Uuid
+  branchId   String  @db.Uuid
+  channel    String
+  label      String
+  enabled    Boolean @default(false)
+  gpPercent  Decimal @default(0) @db.Decimal(5, 2)
+  orderIndex Int     @default(0)
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, channel])
+  @@map("sales_channel_configs")
+}
+
+// ────────────────────────────── 4.5 คลังสินค้า ──────────────────────────────
+
+model Supplier {
+  id       String  @id @default(uuid()) @db.Uuid
+  branchId String  @db.Uuid
+  name     String
+  tel      String?
+  address  String?
+  taxId    String?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch    Branch          @relation(fields: [branchId], references: [id])
+  documents StockDocument[]
+
+  @@unique([branchId, name])
+  @@map("suppliers")
+}
+
+/// stock card — บันทึกทุกความเคลื่อนไหวของสินค้า (หัวข้อ 6.10.1)
+model StockMovement {
+  id           String   @id @default(uuid()) @db.Uuid
+  branchId     String   @db.Uuid
+  productId    String   @db.Uuid
+  pluId        String?  @db.Uuid
+  /// SALE | VOID | RECEIVE | ISSUE | ADJUST_INC | ADJUST_DEC | TRANSFER_OUT | TRANSFER_IN | RETURN | COUNT
+  docType      String
+  docNo        String
+  documentId   String?  @db.Uuid
+  receiptId    String?  @db.Uuid
+  /// +/− เป็นหน่วยฐาน (SKU)
+  qty          Decimal  @db.Decimal(14, 3)
+  unitCost     Decimal  @default(0) @db.Decimal(14, 2)
+  /// คงเหลือหลังรายการ (ส่วนเพิ่มจากต้นฉบับ)
+  balanceAfter Decimal  @db.Decimal(14, 3)
+  occurredAt   DateTime @db.Timestamptz(6)
+  /// ชื่อผู้ทำรายการ (cashier หรือ web user)
+  actorName    String?
+  note         String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  branch  Branch      @relation(fields: [branchId], references: [id])
+  product Product     @relation(fields: [productId], references: [id])
+  plu     ProductPlu? @relation(fields: [pluId], references: [id])
+
+  @@index([branchId, productId, occurredAt])
+  @@index([branchId, occurredAt])
+  @@map("stock_movements")
+}
+
+model StockDocument {
+  id       String @id @default(uuid()) @db.Uuid
+  branchId String @db.Uuid
+  /// RECEIVE | ISSUE | ADJUST | COUNT | TRANSFER_OUT | TRANSFER_IN | RETURN
+  docType  String
+  docNo    String
+  /// ใช้งาน | ยกเลิก | รออนุมัติ | สำเร็จ
+  status   String @default("ใช้งาน")
+
+  /// วันที่ซื้อในบิล
+  docDate           DateTime? @db.Timestamptz(6)
+  supplierId        String?   @db.Uuid
+  supplierName      String?
+  /// เลขที่ในบิลซื้อ
+  supplierInvoiceNo String?
+  refDocNo          String?
+  refDocDate        DateTime? @db.Timestamptz(6)
+  note              String?
+  /// ประเภทจ่ายออก (หัวข้อ 6.10.3)
+  issueType         String?
+  /// ชื่อเอกสารตรวจนับ
+  countName         String?
+  /// ADJUST: INC | DEC
+  adjustDirection   String?
+
+  fromBranchId String?   @db.Uuid
+  toBranchId   String?   @db.Uuid
+  dueDate      DateTime? @db.Timestamptz(6)
+  receivedAt   DateTime? @db.Timestamptz(6)
+  /// เอกสาร TI ที่เกิดจาก TO นี้ (หรือกลับกัน)
+  linkedDocId  String?   @db.Uuid
+
+  subtotal         Decimal @default(0) @db.Decimal(14, 2)
+  discount         Decimal @default(0) @db.Decimal(14, 2)
+  vatAmount        Decimal @default(0) @db.Decimal(14, 2)
+  total            Decimal @default(0) @db.Decimal(14, 2)
+  pricesIncludeVat Boolean @default(false)
+  /// คำนวนต้นทุนเฉลี่ยเมื่อบันทึก
+  computeAvgCost   Boolean @default(false)
+
+  createdBy  String?
+  approvedBy String?
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt  DateTime? @db.Timestamptz(6)
+
+  branch   Branch              @relation(fields: [branchId], references: [id])
+  supplier Supplier?           @relation(fields: [supplierId], references: [id])
+  items    StockDocumentItem[]
+
+  @@unique([branchId, docNo])
+  @@index([branchId, docType, createdAt])
+  @@map("stock_documents")
+}
+
+model StockDocumentItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentId  String   @db.Uuid
+  productId   String   @db.Uuid
+  pluId       String?  @db.Uuid
+  barcode     String?
+  name        String
+  unitName    String?
+  ratio       Decimal  @default(1) @db.Decimal(12, 3)
+  qty         Decimal  @default(0) @db.Decimal(14, 3)
+  unitPrice   Decimal  @default(0) @db.Decimal(14, 2)
+  discount    Decimal  @default(0) @db.Decimal(14, 2)
+  lineTotal   Decimal  @default(0) @db.Decimal(14, 2)
+  /// เอกสารตรวจนับ / ปรับปรุง
+  countedQty  Decimal? @db.Decimal(14, 3)
+  systemQty   Decimal? @db.Decimal(14, 3)
+  diffQty     Decimal? @db.Decimal(14, 3)
+  /// เอกสารรับโอน
+  receivedQty Decimal? @db.Decimal(14, 3)
+  orderIndex  Int      @default(0)
+
+  document StockDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  product  Product       @relation(fields: [productId], references: [id])
+  plu      ProductPlu?   @relation(fields: [pluId], references: [id])
+
+  @@index([documentId])
+  @@map("stock_document_items")
+}
+
+// ────────────────────────────── 4.6 การขาย ──────────────────────────────
+
+model CashRound {
+  id          String @id @default(uuid()) @db.Uuid
+  branchId    String @db.Uuid
+  posDeviceId String @db.Uuid
+  /// รอบที่ N ของวันขาย
+  roundNo     Int    @default(1)
+  /// วันขายที่เปิดรอบ (YYYY-MM-DD)
+  businessDay String
+
+  openedAt    DateTime @db.Timestamptz(6)
+  openedById  String?  @db.Uuid
+  openingCash Decimal  @db.Decimal(14, 2)
+
+  closedAt   DateTime? @db.Timestamptz(6)
+  closedById String?   @db.Uuid
+
+  cashSales    Decimal  @default(0) @db.Decimal(14, 2)
+  cashInTotal  Decimal  @default(0) @db.Decimal(14, 2)
+  cashOutTotal Decimal  @default(0) @db.Decimal(14, 2)
+  expectedCash Decimal? @db.Decimal(14, 2)
+  countedCash  Decimal? @db.Decimal(14, 2)
+  diff         Decimal? @db.Decimal(14, 2)
+  /// open | closed
+  status       String   @default("open")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  branch     Branch      @relation(fields: [branchId], references: [id])
+  posDevice  PosDevice   @relation(fields: [posDeviceId], references: [id])
+  openedBy   Cashier?    @relation(fields: [openedById], references: [id])
+  cashInOuts CashInOut[]
+  receipts   Receipt[]
+
+  @@index([branchId, businessDay])
+  @@map("cash_rounds")
+}
+
+model CashInOut {
+  id          String   @id @default(uuid()) @db.Uuid
+  cashRoundId String   @db.Uuid
+  /// IN | OUT
+  type        String
+  category    String   @default("อื่นๆ")
+  detail      String?
+  amount      Decimal  @db.Decimal(14, 2)
+  occurredAt  DateTime @db.Timestamptz(6)
+  cashierId   String?  @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  cashRound CashRound @relation(fields: [cashRoundId], references: [id], onDelete: Cascade)
+  cashier   Cashier?  @relation(fields: [cashierId], references: [id])
+
+  @@index([cashRoundId])
+  @@map("cash_in_outs")
+}
+
+model Receipt {
+  id          String  @id @default(uuid()) @db.Uuid
+  branchId    String  @db.Uuid
+  posDeviceId String? @db.Uuid
+  cashRoundId String? @db.Uuid
+  receiptNo   String
+  /// ปกติ | ยกเลิก | เปิดอยู่
+  status      String  @default("ปกติ")
+  /// idempotency key จากเครื่อง POS (หัวข้อ 7.10)
+  clientId    String? @unique
+
+  /// ทานที่ร้าน | กลับบ้าน | เดลิเวอรี่
+  orderType    String  @default("ทานที่ร้าน")
+  salesChannel String  @default("ขายหน้าร้าน")
+  tableId      String? @db.Uuid
+  tableNo      String?
+  queueNo      Int?
+  guests       Int?
+
+  memberId    String?  @db.Uuid
+  cashierId   String?  @db.Uuid
+  soldAt      DateTime @db.Timestamptz(6)
+  /// วันขายที่คำนวณจากเวลาเปิด-ปิดร้าน (หัวข้อ 7.6)
+  businessDay String
+
+  subtotal          Decimal  @default(0) @db.Decimal(14, 2)
+  itemDiscountTotal Decimal  @default(0) @db.Decimal(14, 2)
+  billDiscount      Decimal  @default(0) @db.Decimal(14, 2)
+  /// amount | percent
+  billDiscountType  String?
+  billDiscountValue Decimal? @db.Decimal(14, 2)
+  promotionDiscount Decimal  @default(0) @db.Decimal(14, 2)
+  discountTotal     Decimal  @default(0) @db.Decimal(14, 2)
+  optionTotal       Decimal  @default(0) @db.Decimal(14, 2)
+  serviceCharge     Decimal  @default(0) @db.Decimal(14, 2)
+  vatableAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  nonVatableAmount  Decimal  @default(0) @db.Decimal(14, 2)
+  amountBeforeVat   Decimal  @default(0) @db.Decimal(14, 2)
+  vatAmount         Decimal  @default(0) @db.Decimal(14, 2)
+  rounding          Decimal  @default(0) @db.Decimal(14, 2)
+  deliveryFee       Decimal  @default(0) @db.Decimal(14, 2)
+  grandTotal        Decimal  @default(0) @db.Decimal(14, 2)
+  costTotal         Decimal  @default(0) @db.Decimal(14, 2)
+  profit            Decimal  @default(0) @db.Decimal(14, 2)
+  totalQty          Decimal  @default(0) @db.Decimal(14, 3)
+  /// คะแนนที่สมาชิกได้จากบิลนี้
+  pointsEarned      Int      @default(0)
+
+  note       String?
+  voidedAt   DateTime? @db.Timestamptz(6)
+  voidedBy   String?
+  voidReason String?
+
+  taxInvoiceNo    String?
+  taxInvoiceAt    DateTime? @db.Timestamptz(6)
+  customerTaxInfo Json?
+
+  sourceDevice String?
+  /// synced | pending
+  syncStatus   String  @default("synced")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  branch    Branch     @relation(fields: [branchId], references: [id])
+  posDevice PosDevice? @relation(fields: [posDeviceId], references: [id])
+  cashRound CashRound? @relation(fields: [cashRoundId], references: [id])
+  member    Member?    @relation(fields: [memberId], references: [id])
+  cashier   Cashier?   @relation(fields: [cashierId], references: [id])
+  table     ShopTable? @relation(fields: [tableId], references: [id])
+
+  items             ReceiptItem[]
+  payments          ReceiptPayment[]
+  pointTransactions MemberPointTransaction[]
+
+  @@unique([branchId, receiptNo])
+  @@index([branchId, businessDay, status])
+  @@index([branchId, soldAt])
+  @@index([branchId, status])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  receiptId String  @db.Uuid
+  productId String? @db.Uuid
+  pluId     String? @db.Uuid
+  /// snapshot ของสินค้า ณ เวลาขาย — บิลต้องอ่านได้แม้สินค้าถูกลบ
+  barcode   String?
+  name      String
+  unitName  String?
+  ratio     Decimal @default(1) @db.Decimal(12, 3)
+  qty       Decimal @db.Decimal(14, 3)
+  unitPrice Decimal @db.Decimal(14, 2)
+
+  itemDiscount          Decimal @default(0) @db.Decimal(14, 2)
+  itemDiscountType      String  @default("amount")
+  subtotal              Decimal @default(0) @db.Decimal(14, 2)
+  optionTotal           Decimal @default(0) @db.Decimal(14, 2)
+  /// ยอดสุทธิรายการ (ก่อนกระจายส่วนลดท้ายบิล)
+  net                   Decimal @default(0) @db.Decimal(14, 2)
+  /// ยอดสุทธิหลังกระจายส่วนลดท้ายบิล — ฐานของ VAT และรายงานต่อสินค้า
+  netAfterBillDiscount  Decimal @default(0) @db.Decimal(14, 2)
+  allocatedBillDiscount Decimal @default(0) @db.Decimal(14, 2)
+  cost                  Decimal @default(0) @db.Decimal(14, 2)
+  vatType               String  @default("N")
+
+  options          Json?
+  optionGroupNames String?
+  note             String?
+  serialNo         String?
+  stepPriceApplied Boolean @default(false)
+  channelPriceUsed String?
+  orderIndex       Int     @default(0)
+  categoryName     String?
+
+  receipt Receipt     @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product Product?    @relation(fields: [productId], references: [id])
+  plu     ProductPlu? @relation(fields: [pluId], references: [id])
+
+  @@index([receiptId])
+  @@index([productId])
+  @@map("receipt_items")
+}
+
+model ReceiptPayment {
+  id               String  @id @default(uuid()) @db.Uuid
+  receiptId        String  @db.Uuid
+  method           String
+  amount           Decimal @db.Decimal(14, 2)
+  received         Decimal @default(0) @db.Decimal(14, 2)
+  change           Decimal @default(0) @db.Decimal(14, 2)
+  refNo            String?
+  customMethodName String?
+
+  receipt Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@index([receiptId])
+  @@map("receipt_payments")
+}
+
+/// บิลที่เปิดอยู่ / พักบิล / โต๊ะ — ปิดบิลแล้วย้ายเป็น Receipt
+model OpenBill {
+  id           String  @id @default(uuid()) @db.Uuid
+  branchId     String  @db.Uuid
+  posDeviceId  String? @db.Uuid
+  cashierId    String? @db.Uuid
+  /// เลขที่รายการชั่วคราว
+  refNo        String
+  tableId      String? @db.Uuid
+  tableNo      String?
+  memberId     String? @db.Uuid
+  orderType    String  @default("ทานที่ร้าน")
+  salesChannel String  @default("ขายหน้าร้าน")
+  guests       Int?
+  note         String?
+
+  /// รายการในตะกร้า (snapshot เต็ม) + ยอดที่คำนวณไว้
+  items  Json
+  totals Json
+
+  openedAt  DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  table ShopTable? @relation(fields: [tableId], references: [id])
+
+  @@unique([branchId, refNo])
+  @@index([branchId])
+  @@map("open_bills")
+}
+
+model TableZone {
+  id         String @id @default(uuid()) @db.Uuid
+  branchId   String @db.Uuid
+  name       String
+  orderIndex Int    @default(0)
+
+  branch Branch      @relation(fields: [branchId], references: [id])
+  tables ShopTable[]
+
+  @@unique([branchId, name])
+  @@map("table_zones")
+}
+
+model ShopTable {
+  id               String    @id @default(uuid()) @db.Uuid
+  branchId         String    @db.Uuid
+  zoneId           String?   @db.Uuid
+  tableNo          String
+  /// none | small | large
+  size             String    @default("none")
+  x                Int       @default(0)
+  y                Int       @default(0)
+  w                Int       @default(80)
+  h                Int       @default(80)
+  shape            String    @default("rect")
+  /// free | occupied | billing
+  status           String    @default("free")
+  openedAt         DateTime? @db.Timestamptz(6)
+  guests           Int?
+  /// จำกัดเวลานั่ง (นาที) — ใช้แสดงสีเหลืองเมื่อเหลือ < 30 นาที
+  timeLimitMinutes Int?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch    Branch     @relation(fields: [branchId], references: [id])
+  zone      TableZone? @relation(fields: [zoneId], references: [id])
+  openBills OpenBill[]
+  receipts  Receipt[]
+
+  @@unique([branchId, tableNo])
+  @@map("tables")
+}
+
+// ────────────────────────────── 4.7 สมาชิก ──────────────────────────────
+
+model MemberGroup {
+  id           String  @id @default(uuid()) @db.Uuid
+  branchId     String  @db.Uuid
+  name         String
+  /// ช่องทางราคาที่ผูกกับกลุ่มนี้ เช่น member_wholesale
+  priceChannel String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  branch  Branch   @relation(fields: [branchId], references: [id])
+  members Member[]
+
+  @@unique([branchId, name])
+  @@map("member_groups")
+}
+
+model Member {
+  id            String    @id @default(uuid()) @db.Uuid
+  branchId      String    @db.Uuid
+  name          String
+  /// ชาย | หญิง | ไม่ระบุ
+  gender        String    @default("ไม่ระบุ")
+  phone         String?
+  email         String?
+  birthdate     DateTime? @db.Date
+  /// หน้าร้าน | LINE | import
+  channel       String    @default("หน้าร้าน")
+  memberGroupId String?   @db.Uuid
+  address       String?
+
+  firstVisitAt  DateTime? @db.Timestamptz(6)
+  lastVisitAt   DateTime? @db.Timestamptz(6)
+  totalSpent    Decimal   @default(0) @db.Decimal(14, 2)
+  pointsBalance Int       @default(0)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  memberGroup MemberGroup? @relation(fields: [memberGroupId], references: [id])
+
+  receipts          Receipt[]
+  notes             MemberNote[]
+  pointTransactions MemberPointTransaction[]
+
+  @@index([branchId, name])
+  @@index([branchId, phone])
+  @@map("members")
+}
+
+model MemberNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  memberId  String   @db.Uuid
+  title     String
+  detail    String?
+  /// ไม่มีสถานะ | รอดำเนินการ | กำลังดำเนินการ | ปิดเคส
+  status    String   @default("ไม่มีสถานะ")
+  tags      String[]
+  createdBy String?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("member_notes")
+}
+
+model MemberPointTransaction {
+  id        String  @id @default(uuid()) @db.Uuid
+  memberId  String  @db.Uuid
+  receiptId String? @db.Uuid
+  points    Int
+  /// earn | redeem | adjust | import
+  type      String
+  note      String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  member  Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  receipt Receipt? @relation(fields: [receiptId], references: [id])
+
+  @@index([memberId])
+  @@map("member_point_transactions")
+}
+
+// ────────────────────────────── 4.8 อื่น ๆ ──────────────────────────────
+
+model PaymentConfig {
+  id         String  @id @default(uuid()) @db.Uuid
+  branchId   String  @db.Uuid
+  methodKey  String
+  label      String
+  enabled    Boolean @default(false)
+  /// promptpay { id, accountName, showOnReceipt } · linepay { channelId, channelSecret } · edc { wifiIp } …
+  config     Json?
+  imagePath  String?
+  orderIndex Int     @default(0)
+  isCustom   Boolean @default(false)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, methodKey])
+  @@map("payment_configs")
+}
+
+model DeliveryProvider {
+  id       String  @id @default(uuid()) @db.Uuid
+  branchId String  @db.Uuid
+  name     String
+  logo     String?
+  isSystem Boolean @default(false)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, name])
+  @@map("delivery_providers")
+}
+
+model Printer {
+  id            String   @id @default(uuid()) @db.Uuid
+  branchId      String   @db.Uuid
+  name          String
+  /// star | epson | ethernet | bluetooth | usb
+  kind          String   @default("ethernet")
+  ip            String?
+  /// receipt | kitchen | sticker
+  role          String   @default("receipt")
+  /// กลุ่มสินค้าที่ส่งไปพิมพ์ที่เครื่องนี้ (role = kitchen)
+  categoryIds   String[]
+  /// ภาษาชื่อสินค้าที่พิมพ์
+  printLanguage String   @default("th")
+  enabled       Boolean  @default(true)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@map("printers")
+}
+
+/// โปรโมชันพื้นฐาน (หัวข้อ 6.5) — ซื้อ X แถม Y, ลด % ตามกลุ่ม, โค้ด
+model Promotion {
+  id          String    @id @default(uuid()) @db.Uuid
+  branchId    String    @db.Uuid
+  name        String
+  code        String?
+  /// percent | amount | buy_x_get_y
+  kind        String
+  value       Decimal   @default(0) @db.Decimal(14, 2)
+  buyQty      Int?
+  getQty      Int?
+  /// จำกัดเฉพาะกลุ่มสินค้า/สินค้า
+  categoryIds String[]
+  productIds  String[]
+  minSpend    Decimal?  @db.Decimal(14, 2)
+  startAt     DateTime? @db.Timestamptz(6)
+  endAt       DateTime? @db.Timestamptz(6)
+  /// bitmask วัน 0-6 ที่ใช้ได้ (null = ทุกวัน)
+  weekdays    Int[]
+  enabled     Boolean   @default(true)
+  usageLimit  Int?
+  usageCount  Int       @default(0)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  branch Branch           @relation(fields: [branchId], references: [id])
+  usages PromotionUsage[]
+
+  @@unique([branchId, name])
+  @@map("promotions")
+}
+
+model PromotionUsage {
+  id          String  @id @default(uuid()) @db.Uuid
+  promotionId String  @db.Uuid
+  receiptId   String? @db.Uuid
+  memberId    String? @db.Uuid
+  discount    Decimal @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@index([promotionId])
+  @@map("promotion_usages")
+}
+
+model Announcement {
+  id         String    @id @default(uuid()) @db.Uuid
+  title      String
+  body       String?
+  image      String?
+  link       String?
+  activeFrom DateTime? @db.Timestamptz(6)
+  activeTo   DateTime? @db.Timestamptz(6)
+  enabled    Boolean   @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("announcements")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  branchId  String?  @db.Uuid
+  /// account | cashier | system
+  actorType String
+  actorId   String?
+  actorName String?
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  at        DateTime @default(now()) @db.Timestamptz(6)
+
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([branchId, at])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
