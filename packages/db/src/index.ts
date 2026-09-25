@@ -10,8 +10,9 @@ export { Prisma }
  * ต้องบอก Prisma ว่าปลายทางเป็น PgBouncer และจำกัด 1 connection ต่ออินสแตนซ์ serverless
  * ค่าที่ integration ของ Vercel ตั้งให้แก้ไม่ได้ จึงเติมพารามิเตอร์ตรงนี้แทน
  * ต่อสตริงตรง ๆ ไม่ผ่าน new URL() เพื่อไม่ให้รหัสผ่านที่มีอักขระพิเศษถูก encode ใหม่
+ * รับ URL เป็นพารามิเตอร์เสมอ ไม่อ่าน env เอง — ส่ง undefined มาต้องได้ undefined กลับ
  */
-export function resolveDatabaseUrl(raw = process.env.DATABASE_URL): string | undefined {
+export function resolveDatabaseUrl(raw: string | undefined): string | undefined {
   if (!raw) return raw
   const hostPart = raw.split('@').pop()?.split('/')[0] ?? ''
   if (!/pooler/i.test(hostPart)) return raw
@@ -30,7 +31,7 @@ const globalForPrisma = globalThis as unknown as { medeePrisma?: PrismaClient }
 export const prisma =
   globalForPrisma.medeePrisma ??
   new PrismaClient({
-    datasourceUrl: resolveDatabaseUrl(),
+    datasourceUrl: resolveDatabaseUrl(process.env.DATABASE_URL),
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   })
 
